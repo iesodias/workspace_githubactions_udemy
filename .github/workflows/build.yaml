@@ -99,43 +99,78 @@ jobs:
         run: trufflehog filesystem --directory=app --fail
 
   dast-scan:
-    name: Scan DAST com ZAP CLI local
+    name: DAST Scan com ZAP
     runs-on: ubuntu-latest
     needs: docker-scan
-
+  
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@v4  # Atualizado para v4
+  
       - name: Build da imagem Docker
         run: docker build -f ./dockerfile -t spring-app:latest .
-
-      - name: Rodar app na porta 8081
-        run: docker run -d -p 8081:8081 --name spring-app spring-app:latest
-
-      - name: Instalar OWASP ZAP
+  
+      # Usar porta diferente da do ZAP
+      - name: Rodar app na porta 8080
+        run: docker run -d -p 8080:8080 --name spring-app spring-app:latest
+  
+      - name: Baixar e configurar OWASP ZAP
         run: |
-          sudo apt-get update
-          sudo apt-get install -y software-properties-common apt-transport-https wget gnupg
-          wget -q -O - https://raw.githubusercontent.com/zaproxy/zap-admin/master/zap-ppa.gpg | sudo gpg --dearmor -o /usr/share/keyrings/zap.gpg
-          echo "deb [signed-by=/usr/share/keyrings/zap.gpg] https://ppa.launchpadcontent.net/carnil/zaproxy/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/zap.list
-          sudo apt-get update
-          sudo apt-get install -y zaproxy
-
-
-      - name: Rodar ZAP CLI contra aplicação
+          mkdir zap
+          cd zap
+          wget https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
+          tar -xzf ZAP_2.14.0_Linux.tar.gz
+          echo "ZAP_PATH=$PWD/ZAP_2.14.0" >> $GITHUB_ENV
+  
+      # Espera inteligente com timeout maior
+      - name: Aguardar app responder
+        timeout-minutes: 3
         run: |
-          echo "Aguardando app subir na porta 8081..."
-          for i in {1..10}; do
-            nc -zv 127.0.0.1 8081 && break
-            echo "Esperando..."
-            sleep 3
+          for i in {1..30}; do
+            if curl -sSf http://localhost:8080/actuator/health >/dev/null; then
+              echo "App respondendo!"
+              exit 0
+            fi
+            echo "Aguardando app... ($i/30)"
+            sleep 5
           done
-          
-          zap-cli --zap-url http://127.0.0.1 --port 8081 quick-scan http://127.0.0.1:8081 || true
-
+          echo "App não iniciou a tempo"
+          exit 1
+  
+      - name: Rodar ZAP scan
+        run: |
+          ${{ env.ZAP_PATH }}/zap.sh -cmd -quickurl http://localhost:8080 \
+            -quickout /tmp/zap-report.html \
+            -quickprogress
+  
+      # Verifica se encontrou vulnerabilidades
+      - name: Verificar resultados ZAP
+        id: zap-results
+        run: |
+          if grep -q "High Risk" /tmp/zap-report.html; then
+            echo "VULNERABILITIES_FOUND=true" >> $GITHUB_OUTPUT
+            echo "::error::Vulnerabilidades de alto risco encontradas!"
+            exit 1
+          else
+            echo "VULNERABILITIES_FOUND=false" >> $GITHUB_OUTPUT
+          fi
+  
+      - name: Upload do relatório ZAP
+        if: always()  # Sempre envia o relatório mesmo com falhas
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-report
+          path: /tmp/zap-report.html
+  
       - name: Parar container
-        run: docker stop spring-app && docker rm spring-app
-      
+        if: always()  # Garante limpeza mesmo com falhas
+        run: |
+          docker stop spring-app || true
+          docker rm spring-app || true
+  
+      # Falha o job se vulnerabilidades foram encontradas
+      - name: Falhar se vulnerabilidades encontradas
+        if: steps.zap-results.outputs.VULNERABILITIES_FOUND == 'true'
+        run: exit 1
 
 
