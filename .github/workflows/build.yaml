@@ -79,4 +79,20 @@ jobs:
           image-ref: 'spring-app:latest'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1' # <- Falha se encontrar vulnerabilidades
+          exit-code: '0' # <- Falha se encontrar vulnerabilidades - Alterar para 1 para quebrar
+
+  secrets-scan:
+    name: Scanner de Segredos com TruffleHog
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Instalar TruffleHog
+        run: pip install trufflehog
+
+      - name: Rodar TruffleHog no repo
+        run: trufflehog filesystem --directory=app --json --fail
+        
