@@ -90,9 +90,13 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Instalar TruffleHog
-        run: pip install trufflehog
+      - name: Instalar TruffleHog (v3)
+        run: |
+          curl -L https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog-linux-amd64 -o trufflehog
+          chmod +x trufflehog
+          sudo mv trufflehog /usr/local/bin/
 
-      - name: Rodar TruffleHog no repo
-        run: trufflehog filesystem --directory=app --json --fail
+      - name: Rodar TruffleHog no diretório do app
+        run: trufflehog filesystem --directory=app --fail
+        
         
