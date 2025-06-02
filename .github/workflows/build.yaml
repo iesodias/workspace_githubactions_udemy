@@ -71,7 +71,6 @@ jobs:
 
       - name: Build da imagem Docker
         run: docker build -f ./dockerfile -t spring-app:latest .
-      
 
       - name: Scan da imagem com Trivy
         uses: aquasecurity/trivy-action@master
@@ -79,7 +78,7 @@ jobs:
           image-ref: 'spring-app:latest'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0' # <- Falha se encontrar vulnerabilidades - Alterar para 1 para quebrar
+          exit-code: '0' # <- altere para 1 se quiser travar o pipeline
 
   secrets-scan:
     name: Scanner de Segredos com TruffleHog
@@ -96,8 +95,38 @@ jobs:
           chmod +x trufflehog
           sudo mv trufflehog /usr/local/bin/
 
-
       - name: Rodar TruffleHog no diretório do app
         run: trufflehog filesystem --directory=app --fail
-        
-        
+
+  dast-scan:
+    name: Scan DAST com OWASP ZAP
+    runs-on: ubuntu-latest
+    needs: docker-scan
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Build da imagem Docker (ZAP context)
+        run: docker build -f ./dockerfile -t spring-app:latest .
+
+      - name: Rodar app em background
+        run: docker run -d -p 8080:8080 --name spring-app spring-app:latest
+
+      - name: Esperar app ficar disponível
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 8080 && echo "App online!" && break
+            echo "Aguardando aplicação subir..."
+            sleep 2
+          done
+
+      - name: Executar OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:8080'
+          fail_action: true
+          cmd_options: '-config api.disablekey=true'
+
+      - name: Parar container
+        run: docker stop spring-app && docker rm spring-app
