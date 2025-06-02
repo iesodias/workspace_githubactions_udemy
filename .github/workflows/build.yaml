@@ -92,9 +92,10 @@ jobs:
 
       - name: Instalar TruffleHog (v3)
         run: |
-          curl -L https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog-linux-amd64 -o trufflehog
+          curl -sL https://github.com/trufflesecurity/trufflehog/releases/download/v3.63.4/trufflehog_3.63.4_linux_amd64.tar.gz | tar xz
           chmod +x trufflehog
           sudo mv trufflehog /usr/local/bin/
+
 
       - name: Rodar TruffleHog no diretório do app
         run: trufflehog filesystem --directory=app --fail
