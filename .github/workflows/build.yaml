@@ -1,9 +1,15 @@
-name: Build Java App
+name: Build e Análise Java
 
 on:
   push:
     branches:
       - main
+  pull_request:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write  # necessário pro CodeQL subir resultado SARIF
 
 jobs:
   build:
@@ -30,3 +36,27 @@ jobs:
       - name: Build com Maven
         working-directory: app
         run: ./mvnw clean install
+
+  codeql:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+
+      - name: Build do código para análise
+        working-directory: app
+        run: ./mvnw compile -DskipTests
+
+      - name: Executar análise CodeQL
+        uses: github/codeql-action/analyze@v3
