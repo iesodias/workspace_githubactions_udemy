@@ -40,10 +40,6 @@ jobs:
   codeql:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
 
     steps:
       - name: Checkout do código
@@ -60,3 +56,26 @@ jobs:
 
       - name: Executar análise CodeQL
         uses: github/codeql-action/analyze@v3
+
+  docker-scan:
+    name: Scan de Imagem Docker com Trivy
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem Docker
+        run: docker build -t spring-app:latest ./app
+
+      - name: Scan da imagem com Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'spring-app:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1' # <- Falha se encontrar vulnerabilidades
