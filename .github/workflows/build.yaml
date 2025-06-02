@@ -116,7 +116,12 @@ jobs:
       - name: Instalar OWASP ZAP
         run: |
           sudo apt-get update
+          sudo apt-get install -y software-properties-common apt-transport-https wget gnupg
+          wget -q -O - https://raw.githubusercontent.com/zaproxy/zap-admin/master/zap-ppa.gpg | sudo gpg --dearmor -o /usr/share/keyrings/zap.gpg
+          echo "deb [signed-by=/usr/share/keyrings/zap.gpg] https://ppa.launchpadcontent.net/carnil/zaproxy/ubuntu jammy main" | sudo tee /etc/apt/sources.list.d/zap.list
+          sudo apt-get update
           sudo apt-get install -y zaproxy
+
 
       - name: Rodar ZAP CLI contra aplicação
         run: |
