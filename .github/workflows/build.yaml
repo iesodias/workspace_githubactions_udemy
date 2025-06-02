@@ -80,6 +80,24 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0' # <- altere para 1 se quiser travar o pipeline
 
+  secrets-scan:
+    name: Scanner de Segredos com TruffleHog
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Instalar TruffleHog (v3)
+        run: |
+          curl -sL https://github.com/trufflesecurity/trufflehog/releases/download/v3.63.4/trufflehog_3.63.4_linux_amd64.tar.gz | tar xz
+          chmod +x trufflehog
+          sudo mv trufflehog /usr/local/bin/
+
+      - name: Rodar TruffleHog no diretório do app
+        run: trufflehog filesystem --directory=app --fail
+
   dast-scan:
     name: Scan DAST com OWASP ZAP
     runs-on: ubuntu-latest
@@ -113,11 +131,12 @@ jobs:
         run: docker stop spring-app && docker rm spring-app
 
       - name: Upload do Relatório ZAP
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.3
         with:
           name: zap-report
           path: |
             report_html.html
             report_json.json
             report_md.md
+
 
